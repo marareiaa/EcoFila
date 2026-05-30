@@ -185,8 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const proximo = filaAgendados.peek();
     if (proximo && nextName && nextItem) {
         nextName.innerText = proximo.nome;
-        // Usamos innerHTML com um span estilizado em branco para o rótulo
-        nextItem.innerHTML = `<span style="color: #FFFFFF;">Precisa de:</span> ${proximo.necessidade}`;
+        
+        // Garante que o elemento inteiro fique branco
+        nextItem.style.color = "#FFFFFF"; 
+        nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
     }
 }
     // Evento do botão Atender (Dequeue)
