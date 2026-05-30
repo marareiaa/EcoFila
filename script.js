@@ -182,13 +182,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Configura o Painel lateral do Próximo (Peek)
-        const proximo = filaAgendados.peek();
-        if (proximo && nextName && nextItem) {
-            nextName.innerText = proximo.nome;
-            nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
-        }
+    const proximo = filaAgendados.peek();
+    if (proximo && nextName && nextItem) {
+        nextName.innerText = proximo.nome;
+        // Usamos innerHTML com um span estilizado em branco para o rótulo
+        nextItem.innerHTML = `<span style="color: #FFFFFF;">Precisa de:</span> ${proximo.necessidade}`;
     }
-
+}
     // Evento do botão Atender (Dequeue)
     if (btnAtender) {
         btnAtender.addEventListener('click', () => {
