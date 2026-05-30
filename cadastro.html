@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoFila - Cadastro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <a href="index.html" class="logo">🌱 Eco<span>Fila</span></a>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="index.html">Home</a></li>
+            <li class="nav-item"><a href="sobre.html">Sobre</a></li>
+            <li class="nav-item"><a href="cadastro.html" class="active">Cadastrar</a></li>
+            <li class="nav-item"><a href="fila.html">Ver Fila</a></li>
+            <li class="nav-item"><a href="contato.html">Contato</a></li>
+        </ul>
+    </nav>
+</header>
+
+    <main>
+        <section class="section-block">
+            <div class="block-container layout-split">
+                <div class="form-wrapper">
+                    <h2>Oferecer Alimentos</h2>
+                    <p>Registre novos lotes em bom estado para disponibilização imediata.</p>
+                    <form id="formDoador">
+                        <div class="form-group">
+                            <label for="nomeDoador">Nome do Doador / Empresa</label>
+                            <input type="text" id="nomeDoador" class="form-control" required placeholder="Ex: Mercado Central">
+                        </div>
+                        <div class="form-group">
+                            <label for="contatoDoador">Telefone de Contato</label>
+                            <input type="text" id="contatoDoador" class="form-control" required placeholder="Ex: (11) 99999-9999">
+                        </div>
+                        <div class="form-group">
+                            <label for="alimento">Descrição do Lote</label>
+                            <input type="text" id="alimento" class="form-control" required placeholder="Ex: 15kg de hortifrúti embalado">
+                        </div>
+                        <button type="submit" class="btn-cta" style="width: 100%;">Disponibilizar Alimentos</button>
+                    </form>
+                </div>
+                <div class="image-placeholder-box">
+                    <img src="https://i.pinimg.com/1200x/ba/91/44/ba914475a4df8229f8fc3fc06f839b82.jpg" alt="Empresas Doando Alimentos">
+                </div>
+            </div>
+        </section>
+
+        <section class="section-block bg-alternative">
+            <div class="block-container layout-split reverse">
+                <div class="form-wrapper">
+                    <h2>Solicitar Alimentos</h2>
+                    <p>Insira seus dados para ingressar na lista cronológica regulada.</p>
+                    <form id="formSolicitante">
+                        <div class="form-group">
+                            <label for="nomeSolicitante">Nome da Instituição ou Beneficiário</label>
+                            <input type="text" id="nomeSolicitante" class="form-control" required placeholder="Ex: Lar Fraterno">
+                        </div>
+                        <div class="form-group">
+                            <label for="contatoSolicitante">Telefone / Canal de Contato</label>
+                            <input type="text" id="contatoSolicitante" class="form-control" required placeholder="Ex: (11) 98888-8888">
+                        </div>
+                        <div class="form-group">
+                            <label for="necessidade">Item Necessitado</label>
+                            <input type="text" id="necessidade" class="form-control" required placeholder="Ex: Alimentos não-perecíveis / Grãos">
+                        </div>
+                        <button type="submit" class="btn-cta btn-cta-secondary" style="width: 100%;">Solicitar Ingresso na Fila</button>
+                    </form>
+                </div>
+                <div class="image-placeholder-box">
+                    <img src="https://i.pinimg.com/1200x/93/9b/68/939b68ee7ea565f8a9b2e8662c2f907d.jpg" alt="Instituições Beneficiárias recebendo suprimentos">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 EcoFila - Atividades de Estudo Programado</p>
+    </footer>
+
+    <div id="toast"></div>
+    <script src="script.js"></script>
+</body>
+</html>

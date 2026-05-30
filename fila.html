@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoFila - Painel do Sistema</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <a href="index.html" class="logo">🌱 Eco<span>Fila</span></a>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="index.html">Home</a></li>
+            <li class="nav-item"><a href="sobre.html">Sobre</a></li>
+            <li class="nav-item"><a href="cadastro.html">Cadastrar</a></li>
+            <li class="nav-item"><a href="fila.html" class="active">Ver Fila</a></li>
+            <li class="nav-item"><a href="contato.html">Contato</a></li>
+        </ul>
+    </nav>
+</header>
+
+    <main>
+        <section class="section-block">
+            <div class="block-container layout-split">
+                
+                <div class="block-text-content">
+                    <h2>Painel Geral de Atendimento</h2>
+                    <p>Acompanhe abaixo todas as solicitações ativas, organizadas de forma sequencial e transparente.</p>
+                    <div id="queueView" class="queue-list">
+                        </div>
+                </div>
+
+                <div class="form-wrapper">
+                    <h3>Próximo da Fila de Espera</h3>
+                    <div class="next-highlight-box">
+                        <small style="text-transform: uppercase; letter-spacing: 1px; color: rgba(255, 255, 255, 0.396);">Aguardando Atendimento:</small>
+                        <h2 id="nextName" style="color: rgba(255, 255, 255, 0.396); margin: 0.5rem 0;">Nenhum Registro</h2>
+                        <p id="nextItem" style="font-style: italic; font-size: 0.95rem;"></p>
+                    </div>
+                    <button id="btnAtender" class="btn-cta" style="width: 100%;">Atender próxima solicitação</button>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="section-block bg-alternative">
+            <div class="block-container layout-split reverse">
+                <div class="block-text-content">
+                    <h2>Auditoria de Dados Transparente</h2>
+                    <p>A ordem exibida reflete fielmente a estrutura de dados do sistema, garantindo um atendimento justo e sem interferências. Esse processo evita fraudes e assegura transparência na distribuição dos recursos.</p>
+                </div>
+                <div class="image-placeholder-box">
+                    <img src="https://i.pinimg.com/736x/0e/9f/72/0e9f721fca2303f6530ed298f326ee8b.jpg" alt="Monitoramento de Dados em Tempo Real">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 EcoFila - Atividades de Estudo Programado</p>
+    </footer>
+
+    <div id="toast"></div>
+    <script src="script.js"></script>
+</body>
+</html>
