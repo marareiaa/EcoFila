@@ -91,12 +91,16 @@ class Fila {
         return this.itens;
     }
 
+    setAll(novosItens) {
+        this.itens = novosItens;
+        this.salvarLocalStorage();
+    }
+
     salvarLocalStorage() {
         localStorage.setItem('ecofila_queue', JSON.stringify(this.itens));
     }
 }
 
-// Inicializador da Fila Global
 const filaAgendados = new Fila();
 
 // ==========================================================================
@@ -105,7 +109,6 @@ const filaAgendados = new Fila();
 
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Captura de Elementos das Páginas
     const formDoador = document.getElementById('formDoador');
     const formSolicitante = document.getElementById('formSolicitante');
     const queueView = document.getElementById('queueView');
@@ -125,16 +128,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const contato = document.getElementById('contatoDoador').value;
             const alimento = document.getElementById('alimento').value;
 
-            // 1. Mantém sua lógica original baseada em POO
             const novoDoador = new Doador(nome, contato, alimento);
             const novaDoacao = new Doacao(novoDoador.nome, novoDoador.alimento);
 
-            // 2. Mantém o armazenamento LocalStorage intacto como pedido
             let doacoesDisponiveis = JSON.parse(localStorage.getItem('ecofila_donations')) || [];
             doacoesDisponiveis.push(novaDoacao);
             localStorage.setItem('ecofila_donations', JSON.stringify(doacoesDisponiveis));
 
-            // 3. ADIÇÃO EXCLUSIVA: Envia as informações da Empresa/Doador para o Banco de Dados Real
             database.ref('doadores').push({
                 empresa: novoDoador.nome,
                 contato: novoDoador.contato,
@@ -161,13 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const contato = document.getElementById('contatoSolicitante').value;
             const necesidad = document.getElementById('necessidade').value;
 
-            // 1. Mantém sua lógica original baseada em POO
             const novoSolicitante = new Solicitante(nome, contato, necesidad);
 
-            // 2. Mantém o enfileiramento local baseado na Estrutura de Dados Fila
-            filaAgendados.enqueue(novoSolicitante);
-
-            // 3. ADIÇÃO EXCLUSIVA: Envia as informações do Solicitante para o Banco de Dados Real
+            // 1. Enviamos direto para o nó centralizador do Firebase. 
             database.ref('solicitantes').push({
                 nome: novoSolicitante.nome,
                 contato: novoSolicitante.contato,
@@ -181,51 +177,69 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch((error) => {
                 console.error("Erro ao salvar solicitante no banco:", error);
+                showToast("Erro ao salvar solicitante na nuvem.", "error");
             });
         });
     }
 
     /* ==========================================================================
-       LÓGICA DA PÁGINA: FILA.HTML (ATENDIMENTO DE SOLICITANTES)
+       LÓGICA DA PÁGINA: FILA.HTML (ATENDIMENTO DE SOLICITANTES - CORRIGIDO EM TEMPO REAL)
        ========================================================================== */
     function renderizarPainelFila() {
         if (!queueView) return;
 
-        const todos = filaAgendados.getAll();
-        queueView.innerHTML = '';
+        database.ref('solicitantes').on('value', (snapshot) => {
+            queueView.innerHTML = '';
+            const listaTemporaria = [];
 
-        if (todos.length === 0) {
-            queueView.innerHTML = `
-                <div class="empty-state">
-                    <p>Nenhuma solicitação no momento.</p>
-                </div>
-            `;
-            if(nextItem) nextItem.innerText = "";
-            return;
-        }
+            if (!snapshot.exists()) {
+                filaAgendados.setAll([]);
+                queueView.innerHTML = `
+                    <div class="empty-state">
+                        <p>Nenhuma solicitação no momento.</p>
+                    </div>
+                `;
+                if (nextName) nextName.innerText = "Ninguém na fila";
+                if (nextItem) nextItem.innerText = "";
+                return;
+            }
 
-        todos.forEach((solicitante, index) => {
-            const itemHTML = document.createElement('div');
-            itemHTML.className = 'queue-item';
-            itemHTML.innerHTML = `
-                <div>
-                    <strong>${solicitante.nome}</strong> 
-                    <br><small style="color:var(--text-muted)">Necessidade: ${solicitante.necessidade}</small>
-                </div>
-                <div>
-                    <span class="badge badge-item">${solicitante.contato}</span>
-                    <span class="badge badge-position">${index + 1}º Lugar</span>
-                </div>
-            `;
-            queueView.appendChild(itemHTML);
+            snapshot.forEach((childSnapshot) => {
+                const dados = childSnapshot.val();
+                listaTemporaria.push({
+                    key: childSnapshot.key,
+                    nome: dados.nome,
+                    contato: dados.contato,
+                    necessidade: dados.necessidade
+                });
+            });
+          
+            filaAgendados.setAll(listaTemporaria);
+
+            const todos = filaAgendados.getAll();
+            todos.forEach((solicitante, index) => {
+                const itemHTML = document.createElement('div');
+                itemHTML.className = 'queue-item';
+                itemHTML.innerHTML = `
+                    <div>
+                        <strong>${solicitante.nome}</strong> 
+                        <br><small style="color:var(--text-muted)">Necessidade: ${solicitante.necessidade}</small>
+                    </div>
+                    <div>
+                        <span class="badge badge-item">${solicitante.contato}</span>
+                        <span class="badge badge-position">${index + 1}º Lugar</span>
+                    </div>
+                `;
+                queueView.appendChild(itemHTML);
+            });
+
+            const proximo = filaAgendados.peek();
+            if (proximo && nextName && nextItem) {
+                nextName.innerText = proximo.nome;
+                nextItem.style.color = "#FFFFFF"; 
+                nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
+            }
         });
-
-        const proximo = filaAgendados.peek();
-        if (proximo && nextName && nextItem) {
-            nextName.innerText = proximo.nome;
-            nextItem.style.color = "#FFFFFF"; 
-            nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
-        }
     }
 
     if (btnAtender) {
@@ -235,9 +249,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const atendido = filaAgendados.dequeue();
-            showToast(`Sucesso! ${atendido.nome} foi atendido.`, 'success');
-            renderizarPainelFila();
+            const proximoAtendimento = filaAgendados.peek();
+
+            if (proximoAtendimento && proximoAtendimento.key) {
+                database.ref(`solicitantes/${proximoAtendimento.key}`).remove()
+                .then(() => {
+                    showToast(`Sucesso! ${proximoAtendimento.nome} foi atendido e removido do sistema.`, 'success');
+                })
+                .catch((error) => {
+                    console.error("Erro ao remover solicitante do banco:", error);
+                    showToast("Erro ao registrar atendimento na nuvem.", "error");
+                });
+            }
         });
     }
 
@@ -294,7 +317,7 @@ function showToast(mensagem, tipo = 'success') {
     const toast = document.getElementById('toast');
     if (!toast) return;
     
-    toast.innerText = mensagem;
+    toast.innerText = mensaje || mensagem; 
     toast.className = `show ${tipo}`;
     
     setTimeout(() => {
