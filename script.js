@@ -1,6 +1,22 @@
- /* ==========================================================================
- CLASSES PRINCIPAIS
- ========================================================================== */
+// ==========================================================================
+// CONFIGURAÇÃO E INICIALIZAÇÃO DO BANCO DE DADOS FIREBASE
+// ==========================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDrKxpryIJRm0PgdO-Frnx0y1WNcY1BjHk",
+  authDomain: "ecofila-fa5d8.firebaseapp.com",
+  projectId: "ecofila-fa5d8",
+  storageBucket: "ecofila-fa5d8.firebasestorage.app",
+  messagingSenderId: "227124134203",
+  appId: "1:227124134203:web:2f7a0c968cbb33dc88b71e",
+  measurementId: "G-B3G1GXLMS9"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ==========================================================================
+// CLASSES PRINCIPAIS (PROGRAMAÇÃO ORIENTADA A OBJETOS)
+// ==========================================================================
 
 class Usuario {
     constructor(nome, contato) {
@@ -21,9 +37,9 @@ class Doador extends Usuario {
 }
 
 class Solicitante extends Usuario {
-    constructor(nome, contato, necessidade) {
+    constructor(nome, contato, necesidad) {
         super(nome, contato);
-        this.necessidade = necessidade;
+        this.necessidade = necesidad;
         this.dataCadastro = new Date().toISOString();
     }
 }
@@ -37,22 +53,19 @@ class Doacao {
     }
 }
 
-/*
- ESTRUTURA DE DADOS: FILA (FIRST-IN, FIRST-OUT)
- */
+// ==========================================================================
+// ESTRUTURA DE DADOS: FILA (FIRST-IN, FIRST-OUT)
+// ==========================================================================
 class Fila {
     constructor() {
-        // Busca dados já salvos ou inicia vazia
         this.itens = JSON.parse(localStorage.getItem('ecofila_queue')) || [];
     }
 
-    // Adiciona na fila (No final)
     enqueue(solicitante) {
         this.itens.push(solicitante);
         this.salvarLocalStorage();
     }
 
-    // Remove da fila (O primeiro que entrou)
     dequeue() {
         if (this.isEmpty()) {
             return null;
@@ -62,7 +75,6 @@ class Fila {
         return removido;
     }
 
-    // Olhar quem é o próximo sem remover
     peek() {
         return this.isEmpty() ? null : this.itens[0];
     }
@@ -87,9 +99,9 @@ class Fila {
 // Inicializador da Fila Global
 const filaAgendados = new Fila();
 
-/*
- INTERFACE E MANIPULAÇÃO DO DOM (UI)
- */
+// ==========================================================================
+// INTERFACE E MANIPULAÇÃO DO DOM (UI) + INTEGRAÇÃO FIREBASE
+// ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -100,10 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAtender = document.getElementById('btnAtender');
     const nextName = document.getElementById('nextName');
     const nextItem = document.getElementById('nextItem');
+    const painelDoadores = document.getElementById('painelDoadores');
 
-    /* =========================================
-       LÓGICA DA PÁGINA: CADASTRO.HTML
-       ========================================= */
+    /* ==========================================================================
+       LÓGICA DA PÁGINA: CADASTRO.HTML (COM ADIÇÃO DO BANCO DE DADOS)
+       ========================================================================== */
     if (formDoador) {
         formDoador.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -112,17 +125,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const contato = document.getElementById('contatoDoador').value;
             const alimento = document.getElementById('alimento').value;
 
-            // Instanciação via POO
+            // 1. Mantém sua lógica original baseada em POO
             const novoDoador = new Doador(nome, contato, alimento);
             const novaDoacao = new Doacao(novoDoador.nome, novoDoador.alimento);
 
-            // Armazenamento de Histórico de Doações Disponíveis
+            // 2. Mantém o armazenamento LocalStorage intacto como pedido
             let doacoesDisponiveis = JSON.parse(localStorage.getItem('ecofila_donations')) || [];
             doacoesDisponiveis.push(novaDoacao);
             localStorage.setItem('ecofila_donations', JSON.stringify(doacoesDisponiveis));
 
-            showToast(`Obrigado ${novoDoador.nome}! Doação registrada com sucesso.`, 'success');
-            formDoador.reset();
+            // 3. ADIÇÃO EXCLUSIVA: Envia as informações da Empresa/Doador para o Banco de Dados Real
+            database.ref('doadores').push({
+                empresa: novoDoador.nome,
+                contato: novoDoador.contato,
+                itemDoado: novoDoador.alimento,
+                tipo: "Pessoa Jurídica (Doador)",
+                dataCadastro: novoDoador.dataCadastro
+            })
+            .then(() => {
+                showToast(`Obrigado ${novoDoador.nome}! Doação registrada no banco de dados.`, 'success');
+                formDoador.reset();
+            })
+            .catch((error) => {
+                console.error("Erro ao salvar no banco de dados:", error);
+                showToast("Erro ao processar envio para a nuvem.", "error");
+            });
         });
     }
 
@@ -132,22 +159,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const nome = document.getElementById('nomeSolicitante').value;
             const contato = document.getElementById('contatoSolicitante').value;
-            const necessidade = document.getElementById('necessidade').value;
+            const necesidad = document.getElementById('necessidade').value;
 
-            // Instanciação via POO
-            const novoSolicitante = new Solicitante(nome, contato, necessidade);
+            // 1. Mantém sua lógica original baseada em POO
+            const novoSolicitante = new Solicitante(nome, contato, necesidad);
 
-            // Enfileirando usando a Estrutura de Dados
+            // 2. Mantém o enfileiramento local baseado na Estrutura de Dados Fila
             filaAgendados.enqueue(novoSolicitante);
 
-            showToast("Solicitante adicionado à fila com sucesso!", 'success');
-            formSolicitante.reset();
+            // 3. ADIÇÃO EXCLUSIVA: Envia as informações do Solicitante para o Banco de Dados Real
+            database.ref('solicitantes').push({
+                nome: novoSolicitante.nome,
+                contato: novoSolicitante.contato,
+                necessidade: novoSolicitante.necessidade,
+                tipo: "Pessoa Física (Solicitante)",
+                dataCadastro: novoSolicitante.dataCadastro
+            })
+            .then(() => {
+                showToast("Solicitante adicionado à fila e salvo na nuvem!", 'success');
+                formSolicitante.reset();
+            })
+            .catch((error) => {
+                console.error("Erro ao salvar solicitante no banco:", error);
+            });
         });
     }
 
-    /* =========================================
-       LÓGICA DA PÁGINA: FILA.HTML
-       ========================================= */
+    /* ==========================================================================
+       LÓGICA DA PÁGINA: FILA.HTML (ATENDIMENTO DE SOLICITANTES)
+       ========================================================================== */
     function renderizarPainelFila() {
         if (!queueView) return;
 
@@ -164,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Renderiza a lista completa
         todos.forEach((solicitante, index) => {
             const itemHTML = document.createElement('div');
             itemHTML.className = 'queue-item';
@@ -181,17 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
             queueView.appendChild(itemHTML);
         });
 
-        // Configura o Painel lateral do Próximo (Peek)
-    const proximo = filaAgendados.peek();
-    if (proximo && nextName && nextItem) {
-        nextName.innerText = proximo.nome;
-        
-        // Garante que o elemento inteiro fique branco
-        nextItem.style.color = "#FFFFFF"; 
-        nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
+        const proximo = filaAgendados.peek();
+        if (proximo && nextName && nextItem) {
+            nextName.innerText = proximo.nome;
+            nextItem.style.color = "#FFFFFF"; 
+            nextItem.innerText = `Precisa de: ${proximo.necessidade}`;
+        }
     }
-}
-    // Evento do botão Atender (Dequeue)
+
     if (btnAtender) {
         btnAtender.addEventListener('click', () => {
             if (filaAgendados.isEmpty()) {
@@ -199,24 +235,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Remove o elemento com base no FIFO
             const atendido = filaAgendados.dequeue();
             showToast(`Sucesso! ${atendido.nome} foi atendido.`, 'success');
-            
-            // Atualiza o monitor gráfico
             renderizarPainelFila();
         });
     }
 
-    // Inicialização da View, caso esteja na página da fila
+    /* ==========================================================================
+       NOVA LÓGICA: RENDERIZAR PAINEL DE EMPRESAS PARCEIRAS (FIREBASE)
+       ========================================================================== */
+    function renderizarPainelDoadores() {
+        if (!painelDoadores) return;
+
+        database.ref('doadores').on('value', (snapshot) => {
+            painelDoadores.innerHTML = ''; 
+
+            if (!snapshot.exists()) {
+                painelDoadores.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1; text-align: center; width: 100%;">
+                        <p>Nenhum lote de alimento doado no momento.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            snapshot.forEach((childSnapshot) => {
+                const dadosEmpresa = childSnapshot.val();
+
+                const cardHTML = document.createElement('div');
+                cardHTML.className = 'queue-item';
+                cardHTML.style.borderLeft = '4px solid #2ecc71'; 
+                cardHTML.innerHTML = `
+                    <div>
+                        <strong>🏢 ${dadosEmpresa.empresa}</strong> 
+                        <br><small style="color:var(--text-muted)">Disponibilizou: ${dadosEmpresa.itemDoado}</small>
+                    </div>
+                    <div>
+                        <span class="badge badge-item">${dadosEmpresa.contato}</span>
+                    </div>
+                `;
+                painelDoadores.appendChild(cardHTML);
+            });
+        });
+    }
+
     if (queueView) {
         renderizarPainelFila();
+    }
+    if (painelDoadores) {
+        renderizarPainelDoadores();
     }
 });
 
 /*
- COMPONENTE VISUAL: Feedback dinâmico (Toast)
- */
+  COMPONENTE VISUAL: Feedback dinâmico (Toast)
+*/
 function showToast(mensagem, tipo = 'success') {
     const toast = document.getElementById('toast');
     if (!toast) return;
