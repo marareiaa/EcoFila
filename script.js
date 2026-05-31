@@ -14,6 +14,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+// 🔐 CONFIGURAÇÕES DE REGRAS DE NEGÓCIO
+const ADMIN_PASSWORD = "131072"; 
+const LIMITE_DOACOES_POR_DOADOR = 1;    
+const LIMITE_PEDIDOS_POR_RECEPTOR = 1;  
+const ITENS_INICIAIS_FILA = 3;         
+
+let expandido = false;
+
 // ==========================================================================
 // CLASSES PRINCIPAIS (PROGRAMAÇÃO ORIENTADA A OBJETOS)
 // ==========================================================================
@@ -32,7 +40,7 @@ class Doador extends Usuario {
     constructor(nome, contato, alimento) {
         super(nome, contato);
         this.alimento = alimento;
-        this.dataCadastro = new Date().toISOString();
+        this.dataCadastro = new Date().toLocaleString('pt-BR');
     }
 }
 
@@ -40,7 +48,7 @@ class Solicitante extends Usuario {
     constructor(nome, contato, necesidad) {
         super(nome, contato);
         this.necessidade = necesidad;
-        this.dataCadastro = new Date().toISOString();
+        this.dataCadastro = new Date().toLocaleString('pt-BR');
     }
 }
 
@@ -49,7 +57,7 @@ class Doacao {
         this.id = 'DOC_' + Math.random().toString(36).substr(2, 9);
         this.doador = doador;
         this.item = item;
-        this.dataCriacao = new Date().toISOString();
+        this.dataCriacao = new Date().toLocaleString('pt-BR');
     }
 }
 
@@ -67,9 +75,7 @@ class Fila {
     }
 
     dequeue() {
-        if (this.isEmpty()) {
-            return null;
-        }
+        if (this.isEmpty()) return null;
         const removido = this.itens.shift();
         this.salvarLocalStorage();
         return removido;
@@ -104,7 +110,28 @@ class Fila {
 const filaAgendados = new Fila();
 
 // ==========================================================================
-// INTERFACE E MANIPULAÇÃO DO DOM (UI) + INTEGRAÇÃO FIREBASE
+// FUNÇÕES DE VALIDAÇÃO RÍGIDA
+// ==========================================================================
+
+function obterTelefoneValido(telefone) {
+    const apenasNumeros = telefone.replace(/\D/g, '');
+    if (apenasNumeros.length === 10 || apenasNumeros.length === 11) {
+        return apenasNumeros; 
+    }
+    return null; 
+}
+
+function formatarTelefone(numString) {
+    if (numString.length === 11) {
+        return `(${numString.substring(0,2)}) ${numString.substring(2,7)}-${numString.substring(7)}`;
+    } else if (numString.length === 10) {
+        return `(${numString.substring(0,2)}) ${numString.substring(2,6)}-${numString.substring(6)}`;
+    }
+    return numString;
+}
+
+// ==========================================================================
+// INTERFACE E INTEGRAÇÃO FIREBASE
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -118,72 +145,124 @@ document.addEventListener('DOMContentLoaded', () => {
     const painelDoadores = document.getElementById('painelDoadores');
 
     /* ==========================================================================
-       LÓGICA DA PÁGINA: CADASTRO.HTML (COM ADIÇÃO DO BANCO DE DADOS)
+       LÓGICA: CADASTRO DE DOADORES
        ========================================================================== */
     if (formDoador) {
         formDoador.addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const nome = document.getElementById('nomeDoador').value;
-            const contato = document.getElementById('contatoDoador').value;
-            const alimento = document.getElementById('alimento').value;
+            const nome = document.getElementById('nomeDoador').value.trim();
+            const contatoRaw = document.getElementById('contatoDoador').value.trim();
+            const alimento = document.getElementById('alimento').value.trim();
 
-            const novoDoador = new Doador(nome, contato, alimento);
-            const novaDoacao = new Doacao(novoDoador.nome, novoDoador.alimento);
+            const contatoLimpo = obterTelefoneValido(contatoRaw);
+            if (!contatoLimpo) {
+                showToast("Erro: Digite um telefone válido com DDD. Ex: (11) 99999-9999", "error");
+                return; 
+            }
 
-            let doacoesDisponiveis = JSON.parse(localStorage.getItem('ecofila_donations')) || [];
-            doacoesDisponiveis.push(novaDoacao);
-            localStorage.setItem('ecofila_donations', JSON.stringify(doacoesDisponiveis));
+            const contatoFormatado = formatarTelefone(contatoLimpo);
 
-            database.ref('doadores').push({
-                empresa: novoDoador.nome,
-                contato: novoDoador.contato,
-                itemDoado: novoDoador.alimento,
-                tipo: "Pessoa Jurídica (Doador)",
-                dataCadastro: novoDoador.dataCadastro
-            })
-            .then(() => {
-                showToast(`Obrigado ${novoDoador.nome}! Doação registrada no banco de dados.`, 'success');
-                formDoador.reset();
-            })
-            .catch((error) => {
-                console.error("Erro ao salvar no banco de dados:", error);
-                showToast("Erro ao processar envio para a nuvem.", "error");
-            });
-        });
-    }
+            database.ref('doadores').once('value', (snapshot) => {
+                let doacoesAtivas = 0;
 
-    if (formSolicitante) {
-        formSolicitante.addEventListener('submit', (e) => {
-            e.preventDefault();
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const doadorBanco = childSnapshot.val();
+                        const telefoneBancoLimpo = doadorBanco.contato.replace(/\D/g, '');
+                        if (telefoneBancoLimpo === contatoLimpo) doacoesAtivas++;
+                    });
+                }
 
-            const nome = document.getElementById('nomeSolicitante').value;
-            const contato = document.getElementById('contatoSolicitante').value;
-            const necesidad = document.getElementById('necessidade').value;
+                if (doacoesAtivas >= LIMITE_DOACOES_POR_DOADOR) {
+                    showToast(`Limite excedido! Este doador já possui ${LIMITE_DOACOES_POR_DOADOR} lotes ativos no sistema.`, 'error');
+                    return; 
+                }
 
-            const novoSolicitante = new Solicitante(nome, contato, necesidad);
+                const novoDoador = new Doador(nome, contatoFormatado, alimento);
+                const novaDoacao = new Doacao(novoDoador.nome, novoDoador.alimento);
 
-            // 1. Enviamos direto para o nó centralizador do Firebase. 
-            database.ref('solicitantes').push({
-                nome: novoSolicitante.nome,
-                contato: novoSolicitante.contato,
-                necessidade: novoSolicitante.necessidade,
-                tipo: "Pessoa Física (Solicitante)",
-                dataCadastro: novoSolicitante.dataCadastro
-            })
-            .then(() => {
-                showToast("Solicitante adicionado à fila e salvo na nuvem!", 'success');
-                formSolicitante.reset();
-            })
-            .catch((error) => {
-                console.error("Erro ao salvar solicitante no banco:", error);
-                showToast("Erro ao salvar solicitante na nuvem.", "error");
+                let doacoesDisponiveis = JSON.parse(localStorage.getItem('ecofila_donations')) || [];
+                doacoesDisponiveis.push(novaDoacao);
+                localStorage.setItem('ecofila_donations', JSON.stringify(doacoesDisponiveis));
+
+                database.ref('doadores').push({
+                    empresa: novoDoador.nome,
+                    contato: novoDoador.contato,
+                    itemDoado: novoDoador.alimento,
+                    tipo: "Pessoa Jurídica (Doador)",
+                    dataCadastro: novoDoador.dataCadastro
+                })
+                .then(() => {
+                    showToast(`Sucesso! O lote de "${novoDoador.alimento}" foi disponibilizado. Obrigado, ${novoDoador.nome}!`, 'success');
+                    formDoador.reset();
+                })
+                .catch((error) => {
+                    console.error(error);
+                    showToast("Erro ao processar envio para a nuvem.", "error");
+                });
             });
         });
     }
 
     /* ==========================================================================
-       LÓGICA DA PÁGINA: FILA.HTML (ATENDIMENTO DE SOLICITANTES - CORRIGIDO EM TEMPO REAL)
+       LÓGICA: CADASTRO DE SOLICITANTES
+       ========================================================================== */
+    if (formSolicitante) {
+        formSolicitante.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const nome = document.getElementById('nomeSolicitante').value.trim();
+            const contatoRaw = document.getElementById('contatoSolicitante').value.trim();
+            const necesidad = document.getElementById('necessidade').value.trim();
+
+            const contatoLimpo = obterTelefoneValido(contatoRaw);
+            if (!contatoLimpo) {
+                showToast("Erro: Digite um telefone válido com DDD. Ex: (11) 98888-8888", "error");
+                return; 
+            }
+
+            const contatoFormatado = formatarTelefone(contatoLimpo);
+
+            database.ref('solicitantes').once('value', (snapshot) => {
+                let pedidosAtivos = 0;
+
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const solicitanteBanco = childSnapshot.val();
+                        const telefoneBancoLimpo = solicitanteBanco.contato.replace(/\D/g, '');
+                        if (telefoneBancoLimpo === contatoLimpo) pedidosAtivos++;
+                    });
+                }
+
+                if (pedidosAtivos >= LIMITE_PEDIDOS_POR_RECEPTOR) {
+                    showToast(`Acesso negado: Este número já possui ${LIMITE_PEDIDOS_POR_RECEPTOR} solicitação ativa na fila!`, 'error');
+                    return; 
+                }
+
+                const novoSolicitante = new Solicitante(nome, contatoFormatado, necesidad);
+
+                database.ref('solicitantes').push({
+                    nome: novoSolicitante.nome,
+                    contato: novoSolicitante.contato,
+                    necessidade: novoSolicitante.necessidade,
+                    tipo: "Pessoa Física (Solicitante)",
+                    dataCadastro: novoSolicitante.dataCadastro
+                })
+                .then(() => {
+                    showToast(`Sucesso! Você foi inserido na lista de espera cronológica.`, 'success');
+                    formSolicitante.reset();
+                })
+                .catch((error) => {
+                    console.error(error);
+                    showToast("Erro ao salvar solicitante na nuvem.", "error");
+                });
+            });
+        });
+    }
+
+    /* ==========================================================================
+       LÓGICA: RENDERIZAR PAINEL FILA (COM SISTEMA "VER MAIS" REMOTO COERENTE)
        ========================================================================== */
     function renderizarPainelFila() {
         if (!queueView) return;
@@ -201,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 if (nextName) nextName.innerText = "Ninguém na fila";
                 if (nextItem) nextItem.innerText = "";
+                removerBotaoVerMais();
                 return;
             }
 
@@ -210,20 +290,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     key: childSnapshot.key,
                     nome: dados.nome,
                     contato: dados.contato,
-                    necessidade: dados.necessidade
+                    necessidade: dados.necessidade,
+                    data: dados.dataCadastro || "Não informada"
                 });
             });
-          
-            filaAgendados.setAll(listaTemporaria);
 
+            filaAgendados.setAll(listaTemporaria);
             const todos = filaAgendados.getAll();
-            todos.forEach((solicitante, index) => {
+          
+            const itensParaMostrar = expandido ? todos : todos.slice(0, ITENS_INICIAIS_FILA);
+
+            itensParaMostrar.forEach((solicitante, index) => {
                 const itemHTML = document.createElement('div');
                 itemHTML.className = 'queue-item';
                 itemHTML.innerHTML = `
                     <div>
                         <strong>${solicitante.nome}</strong> 
                         <br><small style="color:var(--text-muted)">Necessidade: ${solicitante.necessidade}</small>
+                        <br><small style="color: #95a5a6; font-size: 0.75rem;">Entrou em: ${solicitante.data}</small>
                     </div>
                     <div>
                         <span class="badge badge-item">${solicitante.contato}</span>
@@ -232,6 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 queueView.appendChild(itemHTML);
             });
+
+            if (todos.length > ITENS_INICIAIS_FILA) {
+                criarOuAtualizarBotaoVerMais(todos.length - ITENS_INICIAIS_FILA);
+            } else {
+                removerBotaoVerMais();
+            }
 
             const proximo = filaAgendados.peek();
             if (proximo && nextName && nextItem) {
@@ -242,11 +332,45 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function criarOuAtualizarBotaoVerMais(restantes) {
+        let btnVerMais = document.getElementById('btnVerMaisFila');
+        
+        if (!btnVerMais) {
+            btnVerMais = document.createElement('button');
+            btnVerMais.id = 'btnVerMaisFila';
+
+            btnVerMais.addEventListener('click', () => {
+                expandido = !expandido;
+                renderizarPainelFila(); 
+            });
+            
+            queueView.parentNode.insertBefore(btnVerMais, queueView.nextSibling);
+        }
+        
+        btnVerMais.innerText = expandido ? "▲ Mostrar Menos" : `▼ Ver Mais (+${restantes} pessoas na fila)`;
+    }
+    function removerBotaoVerMais() {
+        const btnVerMais = document.getElementById('btnVerMaisFila');
+        if (btnVerMais) btnVerMais.remove();
+    }
+
+    /* ==========================================================================
+       LÓGICA: BOTÃO ATENDER
+       ========================================================================== */
     if (btnAtender) {
         btnAtender.addEventListener('click', () => {
             if (filaAgendados.isEmpty()) {
                 showToast("Operação Inválida: A fila já está vazia!", 'error');
                 return;
+            }
+
+            const senhaDigitada = prompt("⚠️ Área Restrita!\nPor favor, digite a senha de Administrador para realizar o atendimento:");
+
+            if (senhaDigitada === null) return; 
+
+            if (senhaDigitada !== ADMIN_PASSWORD) {
+                showToast("Senha incorreta! Acesso ao atendimento negado.", 'error');
+                return; 
             }
 
             const proximoAtendimento = filaAgendados.peek();
@@ -257,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast(`Sucesso! ${proximoAtendimento.nome} foi atendido e removido do sistema.`, 'success');
                 })
                 .catch((error) => {
-                    console.error("Erro ao remover solicitante do banco:", error);
+                    console.error(error);
                     showToast("Erro ao registrar atendimento na nuvem.", "error");
                 });
             }
@@ -265,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ==========================================================================
-       NOVA LÓGICA: RENDERIZAR PAINEL DE EMPRESAS PARCEIRAS (FIREBASE)
+       LÓGICA: RENDERIZAR PAINEL DOADORES
        ========================================================================== */
     function renderizarPainelDoadores() {
         if (!painelDoadores) return;
@@ -292,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>
                         <strong>🏢 ${dadosEmpresa.empresa}</strong> 
                         <br><small style="color:var(--text-muted)">Disponibilizou: ${dadosEmpresa.itemDoado}</small>
+                        <br><small style="color: #95a5a6; font-size: 0.75rem;">📅 Doado em: ${dadosEmpresa.dataCadastro || "Não informada"}</small>
                     </div>
                     <div>
                         <span class="badge badge-item">${dadosEmpresa.contato}</span>
@@ -302,25 +427,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (queueView) {
-        renderizarPainelFila();
-    }
-    if (painelDoadores) {
-        renderizarPainelDoadores();
-    }
+    if (queueView) renderizarPainelFila();
+    if (painelDoadores) renderizarPainelDoadores();
 });
 
-/*
-  COMPONENTE VISUAL: Feedback dinâmico (Toast)
-*/
 function showToast(mensagem, tipo = 'success') {
     const toast = document.getElementById('toast');
     if (!toast) return;
     
-    toast.innerText = mensaje || mensagem; 
+    toast.innerText = mensagem;
     toast.className = `show ${tipo}`;
     
     setTimeout(() => {
         toast.className = toast.className.replace('show', '');
-    }, 4000);
+    }, 4500); 
 }
