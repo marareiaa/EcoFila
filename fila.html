@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EcoFila - Painel do Sistema</title>
     <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -28,8 +31,7 @@
                 <div class="block-text-content">
                     <h2>Painel Geral de Atendimento</h2>
                     <p>Acompanhe abaixo todas as solicitações ativas, organizadas de forma sequencial e transparente.</p>
-                    <div id="queueView" class="queue-list">
-                        </div>
+                    <div id="queueView" class="queue-list"></div>
                 </div>
 
                 <div class="form-wrapper">
@@ -54,6 +56,18 @@
                 <div class="image-placeholder-box">
                     <img src="https://i.pinimg.com/736x/0e/9f/72/0e9f721fca2303f6530ed298f326ee8b.jpg" alt="Monitoramento de Dados em Tempo Real">
                 </div>
+            </div>
+        </section>
+
+        <section class="section-block">
+            <div class="block-container" style="display: block; width: 100%;">
+                <div style="text-align: center; margin-bottom: 2.5rem;">
+                    <h2>Empresas e Doações Registradas</h2>
+                    <p>Confira os lotes de alimentos disponibilizados pelas empresas parceiras em nossa plataforma.</p>
+                </div>
+                
+                <div id="painelDoadores" class="queue-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; background: transparent; padding: 0; box-shadow: none;">
+                    </div>
             </div>
         </section>
     </main>
